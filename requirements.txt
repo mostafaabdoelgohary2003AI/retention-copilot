@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-multipart
+pandas
+numpy
+scikit-learn
+joblib
+python-docx
+psycopg2-binary
+httpx
+pytest
+torch
+torchvision
+transformers
+pillow
+pyarrow
+huggingface_hub

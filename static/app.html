@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Retention Copilot</title><link rel="stylesheet" href="/static/style.css"></head><body>
+<div class="shell"><div class="side"><a class="brand" href="/">Retention<i style="color:#00c0c0;font-style:normal">Copilot</i></a>
+<a id="n_up" class="on" onclick="go('up')">1. Upload customers</a><a id="n_res" onclick="go('res')">2. Who is at risk</a><a id="n_as" onclick="go('as')">3. Ask in Arabic</a><a id="n_an" onclick="go('an')">4. Analytics</a><a id="n_ag" onclick="go('ag')">5. Win-back agents</a><a id="n_lab" onclick="go('lab')">6. Feedback and sites</a><a id="n_rep" onclick="go('rep')">7. Report</a>
+<div style="position:absolute;bottom:20px;font-size:.8rem;color:#bfe;"><span id="who"></span></div></div>
+<div class="main">
+<div id="up"><h2>Upload your customers</h2><div class="sub">One row per customer. We find the ones likely to leave.</div>
+<div class="card"><div class="drop"><h3 style="margin-top:0">Drop a spreadsheet (CSV)</h3><input type="file" id="f" accept=".csv"><p><button class="btn" onclick="upl()">Analyze my file</button></p>
+<p>No file handy? <a href="#" onclick="smp();return false"><b>Use the sample: 3,150 real telecom customers</b></a></p><div class="err" id="uerr"></div></div></div></div>
+
+<div id="res" style="display:none"><h2>Who is at risk</h2><div class="sub" id="sub"></div>
+<div class="kpis" id="kpis"></div>
+<div class="two"><div class="card"><h3 style="margin-top:0">How risky is your customer base?</h3><div class="bars" id="hist"></div><div class="axis" id="axis"></div><small>Each bar is a risk range from 0% to 100% (bar heights are square-root scaled so small groups stay visible). Red bars are the danger zone.</small></div>
+<div class="card"><h3 style="margin-top:0">New customers leave more</h3><div id="ten"></div><small>Average chance of leaving by how long the customer has been with you.</small></div></div>
+<div class="card"><h3 style="margin-top:0">Why customers may leave</h3><div id="why"></div></div>
+<div class="card"><div style="display:flex;justify-content:space-between"><h3 style="margin:0">Customers to contact first</h3><span class="tabs"><button class="btn alt" onclick="load('High')">High</button><button class="btn alt" onclick="load('Medium')">Medium</button><button class="btn alt" onclick="load('')">All</button></span></div>
+<table><thead><tr><th>Customer</th><th>Risk</th><th>Why</th><th>What to do</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+
+<div id="as" style="display:none"><h2>Ask in Arabic</h2><div class="sub">Your assistant answers from your own results. Try the examples below.</div>
+<div class="card"><div class="chat" id="chat"></div><p>
+<button class="btn alt" onclick="ask('كم عميل في خطر؟')">كم عميل في خطر؟</button> <button class="btn alt" onclick="ask('من أكثر العملاء خطراً؟')">من أكثر العملاء خطراً؟</button> <button class="btn alt" onclick="ask('لماذا يغادر العملاء؟')">لماذا يغادر العملاء؟</button> <button class="btn alt" onclick="ask('ماذا أفعل؟')">ماذا أفعل؟</button></p>
+<input class="field" id="q" dir="rtl" placeholder="اكتب سؤالك..." onkeydown="if(event.key==='Enter')ask(q.value)"><small>This assistant uses fixed rules plus your numbers. It does not invent answers.</small></div></div>
+
+
+<div id="an" style="display:none"><h2>Analytics</h2><div class="sub">What the numbers say about your customers.</div>
+<div class="two"><div class="card"><h3 style="margin-top:0">Complaints and risk</h3><div id="a1"></div></div><div class="card"><h3 style="margin-top:0">Customer value and risk</h3><div id="a2"></div></div></div>
+<div class="card"><h3 style="margin-top:0">Account value at risk by level</h3><div id="a3"></div></div>
+<div class="card"><h3 style="margin-top:0">How good are the AI models? (tested on data they never saw)</h3><div id="a4"></div></div></div>
+
+<div id="ag" style="display:none"><h2>Win-back agents</h2><div class="sub">A team of small AI agents turns your at-risk customers into a ready campaign.</div>
+<div class="card"><p>Segmenter groups customers. Strategist picks the action. Copywriter drafts an Arabic message. Critic checks it. Planner assembles the plan.</p><button class="btn" onclick="camp()">Build my campaign</button> <span id="cmsg"></span><div id="camps"></div><div id="trace" style="margin-top:14px"></div></div></div>
+
+<div id="lab" style="display:none"><h2>Feedback and sites</h2><div class="sub">Two more AI tools for your team.</div>
+<div class="card"><h3 style="margin-top:0">Read Arabic customer comments</h3><textarea class="field" id="fb" dir="rtl" rows="4" placeholder="الصق تعليقات العملاء هنا، تعليق في كل سطر"></textarea>
+<p><button class="btn" onclick="fbk()">Analyze comments</button> <button class="btn alt" onclick="fbx()">Try examples</button> <span id="fmsg"></span></p><div id="fres"></div></div>
+<div class="card"><h3 style="margin-top:0">Check a branch location from a satellite tile</h3><p>Upload a small satellite image. The model says what kind of area it is and how much walk-in traffic to expect.</p><input type="file" id="sf" accept="image/*"> <button class="btn" onclick="site()">Classify</button><div id="sres"></div></div></div>
+
+<div id="rep" style="display:none"><h2>Your report</h2><div class="sub">A Word document you can hand to your team.</div>
+<div class="card"><p>Includes the summary, the main reasons customers may leave, and the top 15 customers to contact with a suggested action each.</p><a class="btn" href="/api/report">Download report (.docx)</a>
+<h3>Your past analyses</h3><div id="hist2"></div></div></div>
+</div></div>
+<script>
+const $=id=>document.getElementById(id);let S=null;
+function go(x){if(x==='an')an();for(const k of ['up','res','as','an','ag','lab','rep']){$(k).style.display=k===x?'block':'none';$('n_'+k).classList.toggle('on',k===x)}}
+async function j(u,o){const r=await fetch(u,o);if(r.status===401)location='/signin';if(!r.ok)throw new Error((await r.json()).detail);return r.json()}
+j('/api/me').then(m=>$('who').textContent=m.email);
+async function upl(){const f=$('f').files[0];if(!f){$('uerr').textContent='Choose a CSV file first';return}
+ const fd=new FormData();fd.append('file',f);try{await j('/api/upload',{method:'POST',body:fd});await load('High');go('res')}catch(e){$('uerr').textContent=e.message}}
+async function smp(){$('uerr').textContent='Analyzing 3,150 customers...';await j('/api/sample',{method:'POST'});await load('High');go('res')}
+async function load(b){const d=await j('/api/results?band='+b+'&limit=25');S=d.summary;
+ $('sub').textContent=S.total.toLocaleString()+' customers analyzed';
+ $('kpis').innerHTML=`<div class="kpi"><b>${S.total.toLocaleString()}</b><span>customers analyzed</span></div><div class="kpi risk"><b>${S.high}</b><span>at high risk (${Math.round(S.high/S.total*100)}%)</span></div><div class="kpi"><b>${S.medium}</b><span>at medium risk</span></div><div class="kpi risk"><b>${Math.round(S.revenue_at_risk).toLocaleString()}</b><span>account value at risk (sample units)</span></div>`;
+ const mx=Math.max(...S.hist);$('hist').innerHTML=S.hist.map((v,i)=>`<div class="${i>=7?'hot':''}" style="height:${Math.max(3,Math.sqrt(v/mx)*100)}%" title="${v}"></div>`).join('');
+ $('axis').innerHTML=S.hist.map((v,i)=>`<span>${i*10}%</span>`).join('');
+ $('ten').innerHTML=S.tenure_risk.map(t=>`<div style="margin:10px 0"><div style="display:flex;justify-content:space-between"><b>${t.label}</b><span>${Math.round(t.avg*100)}% (${t.n})</span></div><div style="background:#e8fafa;border-radius:8px"><div style="width:${t.avg*100}%;min-width:3px;height:12px;border-radius:8px;background:linear-gradient(90deg,#00808c,#d45d4a)"></div></div></div>`).join('');
+ $('why').innerHTML=S.top_reasons.map(r=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e6f5f5"><span>${r[0]}</span><b>${r[1]} customers</b></div>`).join('');
+ $('rows').innerHTML=d.customers.map(c=>`<tr><td><b>#${c.id}</b></td><td><span class="pill ${c.band}">${Math.round(c.risk*100)}% ${c.band}</span></td><td>${c.reasons.join('<br>')}</td><td>${c.actions.join('<br>')}</td></tr>`).join('');
+ $('hist2').innerHTML=d.history.map(h=>`<div style="padding:6px 0;border-bottom:1px solid #e6f5f5">${h.name} - ${h.summary.high} high risk of ${h.summary.total}</div>`).join('')}
+function add(c,t){const m=document.createElement('div');m.className='msg '+c;m.textContent=t;$('chat').appendChild(m);$('chat').scrollTop=1e9}
+async function ask(t){if(!t)return;add('me',t);$('q').value='';const r=await j('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:t})});add('bot',r.answer)}
+
+const bar=(l,n,v)=>`<div style="margin:10px 0"><div style="display:flex;justify-content:space-between"><b>${l}</b><span>${Math.round(v*100)}%${n===''?'':' avg risk ('+n+')'}</span></div><div style="background:#e8fafa;border-radius:8px"><div style="width:${v*100}%;min-width:3px;height:12px;border-radius:8px;background:linear-gradient(90deg,#00808c,#d45d4a)"></div></div></div>`;
+async function an(){try{const a=await j('/api/analytics');
+ $('a1').innerHTML=a.by_complaint.map(x=>bar(x.label,x.n,x.avg_risk)).join('');$('a2').innerHTML=a.by_value.map(x=>bar(x.label,x.n,x.avg_risk)).join('');
+ const mx=Math.max(...a.value_at_risk_by_band.map(x=>x.value))||1;$('a3').innerHTML=a.value_at_risk_by_band.map(x=>`<div style="margin:10px 0"><b>${x.band}</b> ${x.value.toLocaleString()}<div style="background:#e8fafa;border-radius:8px"><div style="width:${x.value/mx*100}%;height:12px;border-radius:8px;background:${x.band==='High'?'#d45d4a':x.band==='Medium'?'#00808c':'#00c0c0'}"></div></div></div>`).join('');
+ const d=a.dl_vs_ml,n=a.nlp;let h='<table><thead><tr><th>Model</th><th>Task</th><th>Result</th></tr></thead><tbody>';
+ if(d)h+=`<tr><td>Neural network (deep learning)</td><td>Who will leave</td><td>${(d.mlp_test_accuracy*100).toFixed(1)}% accuracy, AUC ${d.mlp_test_auc} (${d.test_rows} unseen customers)</td></tr><tr><td>Gradient boosting (machine learning)</td><td>Who will leave</td><td>AUC ${d.gradient_boosting_same_split_auc}</td></tr>`;
+ if(n)h+=`<tr><td>Arabic BERT (CAMeLBERT)</td><td>Comment sentiment</td><td>${(n.camelbert_zero_shot_acc*100).toFixed(1)}% on ${n.heldout_rows} unseen restaurant reviews (${(n.camelbert_acc_when_not_neutral*100).toFixed(1)}% when it picks a side, it also answers neutral)</td></tr><tr><td>Text statistics baseline</td><td>Comment sentiment</td><td>${(n.tfidf_logreg_acc*100).toFixed(1)}% (trained on restaurant reviews only)</td></tr>`;
+ h+='<tr><td>ResNet18 (computer vision)</td><td>Satellite tile type</td><td>94.0% on 2,161 unseen tiles</td></tr></tbody></table>';$('a4').innerHTML=h}catch(e){$('a1').textContent='Upload customers first'}}
+async function camp(){$('cmsg').textContent='Agents working...';try{const r=await j('/api/campaign',{method:'POST'});$('cmsg').textContent='Done in '+r.seconds+'s';
+ $('camps').innerHTML=r.campaigns.map(c=>`<div class="card" style="background:#f4fcfc"><h3 style="margin-top:0">Segment ${c.segment}: ${c.customers} customers, ${Math.round(c.avg_risk*100)}% avg risk</h3><p><b>Main reasons:</b> ${c.reasons.join(', ')}<br><b>Action:</b> ${c.action}<br><b>Value at risk:</b> ${c.value_at_risk.toLocaleString()}</p><p dir="rtl" style="background:#fff;padding:12px;border-radius:10px">${c.message}</p><small>Message written by: ${c.message_source==='llm'?'open LLM (Qwen2.5-0.5B), checked by the Critic':'safe template (the LLM draft did not pass the Critic)'}</small></div>`).join('');
+ $('trace').innerHTML='<h4>What the agents did</h4>'+r.trace.map(t=>`<div style="padding:4px 0;border-bottom:1px solid #e6f5f5"><b>${t.agent}</b>: ${t.step}</div>`).join('')}catch(e){$('cmsg').textContent=e.message}}
+const EX='الخدمة ممتازة وسريعة وأنا سعيد جداً\nالشبكة ضعيفة والمكالمات تنقطع باستمرار وهذا سيء\nالأسعار غالية ولم يرد أحد على شكواي';
+function fbx(){$('fb').value=EX.replace(/\\n/g,'\n')}
+async function fbk(){$('fmsg').textContent='Reading...';try{const r=await j('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('fb').value})});$('fmsg').textContent='';
+ const L={positive:'Positive',negative:'Negative',neutral:'Neutral'};$('fres').innerHTML=r.results.map(x=>`<div style="padding:10px 0;border-bottom:1px solid #e6f5f5"><span class="pill ${x.label==='negative'?'High':x.label==='positive'?'Low':'Medium'}">${L[x.label]||x.label} ${Math.round(x.score*100)}%</span> ${x.topics.map(t=>`<span class="pill Medium">${t}</span>`).join(' ')}<div dir="rtl" style="margin-top:6px">${x.text}</div></div>`).join('')}catch(e){$('fmsg').textContent=e.message}}
+async function site(){const f=$('sf').files[0];if(!f)return;const fd=new FormData();fd.append('file',f);const r=await j('/api/site',{method:'POST',body:fd});
+ $('sres').innerHTML=`<p><b>This looks like: ${r.land_use}</b> ${r.confident?'':'(not sure)'}<br>Expected walk-in traffic: <b>${r.footfall}</b></p>`+r.top.map(t=>bar(t.plain,"",t.prob)).join('')}
+add('bot','مرحباً! اسألني عن عملائك بعد رفع الملف.');
+</script></body></html>

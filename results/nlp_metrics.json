@@ -1,0 +1,10 @@
+{
+ "camelbert_acc_when_not_neutral": 0.8271,
+ "heldout_rows": 1000,
+ "tfidf_logreg_acc": 0.865,
+ "tfidf_logreg_f1": 0.9098,
+ "camelbert_zero_shot_acc": 0.737,
+ "camelbert_zero_shot_f1": 0.7914,
+ "camelbert_neutral_predictions": 150,
+ "camelbert_seconds": 115.0
+}

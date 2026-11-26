@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in - Retention Copilot</title><link rel="stylesheet" href="/static/style.css"></head><body>
+<div class="nav"><a href="/" class="brand">Retention<i>Copilot</i></a></div>
+<div class="auth"><h2 id="t" style="margin-top:0;color:var(--deep)">Welcome back</h2>
+<label>Email</label><input id="e" type="email" placeholder="you@company.com">
+<label>Password</label><input id="p" type="password" placeholder="At least 6 characters">
+<div class="err" id="err"></div>
+<button class="btn" style="width:100%" onclick="go()" id="b">Sign in</button>
+<p style="text-align:center"><a href="#" onclick="sw();return false" id="s">New here? Create an account</a></p></div>
+<script>
+let mode='login';
+function sw(){mode=mode==='login'?'signup':'login';t.textContent=mode==='login'?'Welcome back':'Create your account';b.textContent=mode==='login'?'Sign in':'Create account';s.textContent=mode==='login'?'New here? Create an account':'Already have an account? Sign in'}
+async function go(){const r=await fetch('/api/'+mode,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e.value,password:p.value})});
+ if(r.ok)location='/app';else err.textContent=(await r.json()).detail}
+</script></body></html>

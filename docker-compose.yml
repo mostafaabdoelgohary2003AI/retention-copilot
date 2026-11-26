@@ -1,0 +1,12 @@
+services:
+  db:
+    image: postgres:16
+    environment: {POSTGRES_PASSWORD: copilotpass, POSTGRES_DB: copilot}
+    volumes: [pgdata:/var/lib/postgresql/data]
+  app:
+    build: .
+    ports: ["8000:7860"]
+    environment:
+      DATABASE_URL: postgresql://postgres:copilotpass@db:5432/copilot
+    depends_on: [db]
+volumes: {pgdata: {}}
