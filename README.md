@@ -36,8 +36,8 @@ How it works and where it is limited:
 - The per-customer risk shown comes from 5-fold cross-validation, so each customer is scored by a model that never saw them.
 - "Why" lines are churn rates measured in your file for the top inputs. They show patterns, not proof of cause, and are not SHAP.
 - Suggested actions in this mode are generic by risk band. The tailored actions and the Arabic win-back agents were written for the Iranian layout.
-- Needs 200+ customers with a known outcome, at least 30 in each group, at most 20,000 rows. Free text and columns with more than 30 distinct values are skipped, and columns named like churn score or churn reason are left out as leakage.
-- A 20,000-row file took about 12 s and 240 MB peak memory locally. It has not been timed on the free Railway tier (0.5 GB RAM).
+- Needs 200+ customers with a known outcome and at least 30 in each group. Files above 20,000 rows are not rejected: a random sample of 20,000 is used (stratified on the churn column, fixed seed) and the page says so. Free text and columns with more than 30 distinct values are skipped, and columns named like churn score or churn reason are left out as leakage.
+- A 20,000-row file took about 12 s and 240 MB peak memory locally. A 63,387-row file (the IBM Telco rows repeated, used only to test size and memory, not accuracy) took 12.6 s and 313 MB peak, sampling down to 20,000. It has not been timed on the free Railway tier (0.5 GB RAM).
 - Bad files return a plain error message on the page instead of a crash. Tests are in `tests/test_generic.py`. The IBM file is not stored in this repo: https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv
 
 ## What is real

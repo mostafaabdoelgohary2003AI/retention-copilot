@@ -99,6 +99,8 @@ async def any_error(request: Request, exc: Exception):
 async def upload(req: Request, file: UploadFile):
     u = me(req)
     raw = await file.read()
+    if len(raw) > 80_000_000:
+        raise HTTPException(413, "This file is larger than 80 MB. Remove columns you do not need and try again.")
     if not raw.strip():
         raise HTTPException(400, "This file is empty.")
     try:

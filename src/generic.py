@@ -83,13 +83,17 @@ def prepare(df, target, id_col=None):
     df, y = df[keep].reset_index(drop=True), y[keep].astype(int).reset_index(drop=True)
     if len(df) < MIN_ROWS:
         raise DataError(f"Need at least {MIN_ROWS} customers with a known churn value to train a model. Found {len(df)}.")
-    if len(df) > MAX_ROWS:
-        raise DataError(f"Max {MAX_ROWS:,} customers per file. This file has {len(df):,}.")
     n1 = int(y.sum()); n0 = len(y) - n1
     if min(n0, n1) < MIN_PER_CLASS:
         raise DataError(f"Only {min(n0, n1)} customers are in the smaller group (left or stayed). Need at least {MIN_PER_CLASS}.")
-    drop = {target} | ({id_col} if id_col else set())
     warnings = []
+    if len(df) > MAX_ROWS:
+        total = len(df)
+        keep_idx, _ = train_test_split(np.arange(total), train_size=MAX_ROWS, stratify=y, random_state=0)
+        keep_idx = np.sort(keep_idx)
+        df, y = df.iloc[keep_idx].reset_index(drop=True), y.iloc[keep_idx].reset_index(drop=True)
+        warnings.append(f"This file has {total:,} customers, so a random sample of {MAX_ROWS:,} was used (same share of customers who left, fixed seed). The free server cannot train on more.")
+    drop = {target} | ({id_col} if id_col else set())
     leaks = [c for c in df.columns if c not in drop and any(k in c.lower() for k in LEAK_HINTS)]
     if leaks:
         drop |= set(leaks)

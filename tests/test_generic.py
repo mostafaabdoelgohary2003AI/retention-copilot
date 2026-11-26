@@ -69,3 +69,11 @@ def test_bad_files_get_json_errors():
         r = c.post("/api/train", json={"target": "x"}); assert r.status_code == 400
         c.post("/api/upload", files={"file": ("a.csv", b"a,b\n1,2\n3,4\n", "text/csv")})
         r = c.post("/api/train", json={"target": "a"}); assert r.status_code == 400 and "detail" in r.json()
+
+
+def test_large_file_is_sampled_not_rejected():
+    big = pd.concat([real_generic_csv()] * 7, ignore_index=True)  # 22,050 rows: repeated real rows, only to test the size rule
+    out, m = generic.train_and_score(big, "left_company")
+    assert len(out) == generic.MAX_ROWS and m["rows"] == generic.MAX_ROWS
+    assert any("random sample of 20,000" in w and "22,050" in w for w in m["warnings"])
+    assert abs(m["churn_rate"] - 0.1571) < 0.002
