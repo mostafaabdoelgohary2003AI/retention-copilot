@@ -4,6 +4,8 @@
 
 A small web product that answers one business question: **which customers are about to leave, why, and what should we do?**
 
+**Demo:** [Screenshot walkthrough on Hugging Face Spaces](https://huggingface.co/spaces/mostafaabdo2003ai/retention-copilot-walkthrough) (screenshots of the real app on the sample data, not a live app; run it yourself with the steps below).
+
 User journey: landing page -> create account / sign in -> upload a customer CSV (or use the 3,150-customer sample) -> dashboard (risk levels, risk by tenure, main reasons, contact list with suggested actions) -> Arabic assistant -> downloadable Word report.
 
 ## What is real
