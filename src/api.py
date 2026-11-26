@@ -5,12 +5,15 @@ from fastapi import FastAPI, UploadFile, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 from . import db, scoring, assistant, report, agents
-from .churn_prep import load_raw
+from .churn_prep import load_raw, RENAME
+from . import generic
+from fastapi.responses import JSONResponse
 
 from fastapi.staticfiles import StaticFiles
 app = FastAPI(title="Retention Copilot")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 STATE = {}  # user_id -> scored rows (in-memory per process)
+UPLOADS = {}  # user_id -> (dataframe, filename) waiting for the column-mapping step
 
 class Cred(BaseModel):
     email: str
@@ -57,41 +60,84 @@ def login(c: Cred, resp: Response):
 @app.get("/api/me")
 def whoami(req: Request): return me(req)
 
-def _process(u, df, name):
-    if len(df) > 20000: raise HTTPException(413, "Max 20,000 customers per file")
-    sc = scoring.score_dataframe(df.reset_index(drop=True))
-    rows = [{"id": int(i) + 1, "risk": float(r.risk), "band": str(r.risk_band),
-             "reasons": list(r.reasons), "actions": list(r.actions),
-             "complaints": int(r.complaints) if "complaints" in sc else 0,
-             "months": int(r.subscription_length) if "subscription_length" in sc else 0,
-             "value": float(r.customer_value) if "customer_value" in sc else 0.0}
-            for i, r in sc.iterrows()]
-    s = scoring.summary(sc)
+def _finish(u, rows, s, name, generic_mode=False):
     s["revenue_at_risk"] = round(sum(r["value"] for r in rows if r["band"] == "High"), 0)
-    # risk histogram (10 bins) and value-by-band for the dashboard
     s["hist"] = [sum(1 for r in rows if min(int(r["risk"] * 10), 9) == b) for b in range(10)]
     s["tenure_risk"] = []
     for lo, hi, lab in [(0, 6, "0-6 months"), (7, 18, "7-18 months"), (19, 30, "19-30 months"), (31, 999, "31+ months")]:
         g = [r["risk"] for r in rows if lo <= r["months"] <= hi]
         s["tenure_risk"].append({"label": lab, "n": len(g), "avg": round(sum(g) / len(g), 3) if g else 0})
-    STATE[u["id"]] = {"rows": rows, "summary": s}
+    STATE[u["id"]] = {"rows": rows, "summary": s, "generic": generic_mode}
     db.save_run(u["id"], name, {k: s[k] for k in ("total", "high", "medium", "low")})
     return s
+
+def _process(u, df, name):
+    if len(df) > 20000: raise HTTPException(413, "Max 20,000 customers per file")
+    try:
+        sc = scoring.score_dataframe(df.reset_index(drop=True))
+        rows = [{"id": int(i) + 1, "risk": float(r.risk), "band": str(r.risk_band),
+                 "reasons": list(r.reasons), "actions": list(r.actions),
+                 "complaints": int(r.complaints) if "complaints" in sc else 0,
+                 "months": int(r.subscription_length) if "subscription_length" in sc else 0,
+                 "value": float(r.customer_value) if "customer_value" in sc else 0.0}
+                for i, r in sc.iterrows()]
+    except (ValueError, TypeError, KeyError) as e:
+        raise HTTPException(400, f"The columns are there but some values could not be read as numbers ({e}). Check for text or empty cells.")
+    return _finish(u, rows, scoring.summary(sc), name)
+
+class Mapping(BaseModel):
+    target: str
+    id: str | None = None
+    tenure: str | None = None
+    value: str | None = None
+
+@app.exception_handler(Exception)
+async def any_error(request: Request, exc: Exception):
+    return JSONResponse({"detail": "Something went wrong on our side while processing this file. Try the sample, or a smaller file."}, status_code=500)
 
 @app.post("/api/upload")
 async def upload(req: Request, file: UploadFile):
     u = me(req)
+    raw = await file.read()
+    if not raw.strip():
+        raise HTTPException(400, "This file is empty.")
     try:
-        df = pd.read_csv(io.BytesIO(await file.read()))
-        from .churn_prep import RENAME
-        df.columns = [c.strip() for c in df.columns]
-        df = df.rename(columns=RENAME)
-        need = ["complaints", "call_failures", "subscription_length", "seconds_of_use"]
-        miss = [c for c in need if c not in df.columns]
-        if miss: raise ValueError("missing columns: " + ", ".join(miss))
-    except Exception as e:
-        raise HTTPException(400, f"We could not read this file ({e}). Try the sample file first.")
-    return _process(u, df, file.filename)
+        df = pd.read_csv(io.BytesIO(raw))
+    except Exception:
+        raise HTTPException(400, "This does not look like a CSV file (comma-separated, first row = column names).")
+    df.columns = [str(c).strip() for c in df.columns]
+    if len(df) == 0 or len(df.columns) < 2:
+        raise HTTPException(400, "The file needs a header row, at least 2 columns and some customers.")
+    if set(RENAME) <= set(df.columns):
+        return _process(u, df.rename(columns=RENAME), file.filename)
+    UPLOADS[u["id"]] = (df, file.filename)
+    try:
+        guess = generic.suggest(df)
+    except generic.DataError as e:
+        raise HTTPException(400, str(e))
+    return {"needs_mapping": True, "filename": file.filename, "rows": int(len(df)),
+            "columns": list(df.columns), "suggest": guess}
+
+@app.post("/api/train")
+def train(m: Mapping, req: Request):
+    u = me(req)
+    if u["id"] not in UPLOADS:
+        raise HTTPException(400, "Upload your file first.")
+    df, name = UPLOADS[u["id"]]
+    try:
+        sc, met = generic.train_and_score(df, m.target, m.id, m.tenure, m.value)
+    except generic.DataError as e:
+        raise HTTPException(400, str(e))
+    rows = [{"id": r.cust, "risk": float(r.risk), "band": str(r.risk_band), "reasons": list(r.reasons),
+             "actions": list(r.actions), "complaints": 0, "months": int(r.months), "value": float(r.value)}
+            for r in sc.itertuples()]
+    band = sc["risk_band"].value_counts().to_dict()
+    from collections import Counter
+    c = Counter(x for rs in sc["reasons"] for x in rs)
+    s = {"total": int(len(sc)), "high": int(band.get("High", 0)), "medium": int(band.get("Medium", 0)),
+         "low": int(band.get("Low", 0)), "avg_risk": round(float(sc["risk"].mean()), 4),
+         "top_reasons": c.most_common(5), "model": met, "has_value": bool(m.value), "has_tenure": bool(m.tenure)}
+    return _finish(u, rows, s, name, generic_mode=True)
 
 @app.post("/api/sample")
 def sample(req: Request):
@@ -133,6 +179,10 @@ def analytics(req: Request):
     u = me(req); st = STATE.get(u["id"])
     if not st: raise HTTPException(404, "Upload a customer file first")
     rows = st["rows"]
+    if st.get("generic"):
+        return {"by_complaint": [], "by_value": [],
+                "value_at_risk_by_band": [{"band": b, "value": round(sum(r["value"] for r in rows if r["band"] == b))} for b in ("High", "Medium", "Low")],
+                "dl_vs_ml": None, "nlp": None, "model": st["summary"].get("model")}
     def grp(f, labels):
         out = []
         for lab, fn in labels:

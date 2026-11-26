@@ -22,6 +22,24 @@ Real captures of the app running locally on the public 3,150-customer sample, wi
 | ![Report](assets/screenshots/05-report.png) | |
 | Downloadable Word report | |
 
+## Works with any churn CSV
+Upload a CSV with a column that says who left (Yes/No or 1/0). If it is not the Iranian-telecom layout, the app asks you to pick that column (plus optional id, tenure and value columns), trains a gradient boosting model on your file, and shows risk scores. The Iranian sample and its pre-trained model still work as before.
+
+Measured (local run, 25% of rows held out, a majority-guess baseline for comparison):
+
+| Dataset | Rows | Held-out accuracy | Majority baseline | ROC-AUC | Time |
+|---|---|---|---|---|---|
+| IBM Telco Customer Churn (Apache-2.0) | 7,043 | 78.4% | 73.5% | 0.830 | about 6 s |
+| UCI Iranian churn, through the general path | 3,150 | 96.6% | 84.3% | 0.992 | about 3 s |
+
+How it works and where it is limited:
+- The per-customer risk shown comes from 5-fold cross-validation, so each customer is scored by a model that never saw them.
+- "Why" lines are churn rates measured in your file for the top inputs. They show patterns, not proof of cause, and are not SHAP.
+- Suggested actions in this mode are generic by risk band. The tailored actions and the Arabic win-back agents were written for the Iranian layout.
+- Needs 200+ customers with a known outcome, at least 30 in each group, at most 20,000 rows. Free text and columns with more than 30 distinct values are skipped, and columns named like churn score or churn reason are left out as leakage.
+- A 20,000-row file took about 12 s and 240 MB peak memory locally. It has not been timed on the free Railway tier (0.5 GB RAM).
+- Bad files return a plain error message on the page instead of a crash. Tests are in `tests/test_generic.py`. The IBM file is not stored in this repo: https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv
+
 ## What is real
 - ML model: gradient boosting trained on the public Iranian Churn dataset (UCI #563, 3,150 customers). Held-out ROC-AUC 0.992, accuracy 96.3% (see the churn-insight-platform repo for the benchmark).
 - Accounts and run history in a real database (SQLite locally, Postgres with docker compose), with SQL migrations. Passwords are salted PBKDF2 hashes.

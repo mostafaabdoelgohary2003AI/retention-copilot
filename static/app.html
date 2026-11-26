@@ -5,10 +5,11 @@
 <div class="main">
 <div id="up"><h2>Upload your customers</h2><div class="sub">One row per customer. We find the ones likely to leave.</div>
 <div class="card"><div class="drop"><h3 style="margin-top:0">Drop a spreadsheet (CSV)</h3><input type="file" id="f" accept=".csv"><p><button class="btn" onclick="upl()">Analyze my file</button></p>
-<p>No file handy? <a href="#" onclick="smp();return false"><b>Use the sample: 3,150 real telecom customers</b></a></p><div class="err" id="uerr"></div></div></div></div>
+<p>No file handy? <a href="#" onclick="smp();return false"><b>Use the sample: 3,150 real telecom customers</b></a></p><div class="err" id="uerr" style="font-weight:700;font-size:15px;margin-top:10px"></div></div></div>
+<div class="card" id="map" style="display:none"></div></div>
 
 <div id="res" style="display:none"><h2>Who is at risk</h2><div class="sub" id="sub"></div>
-<div class="kpis" id="kpis"></div>
+<div class="kpis" id="kpis"></div><div class="card" id="modelnote" style="display:none"></div>
 <div class="two"><div class="card"><h3 style="margin-top:0">How risky is your customer base?</h3><div class="bars" id="hist"></div><div class="axis" id="axis"></div><small>Each bar is a risk range from 0% to 100% (bar heights are square-root scaled so small groups stay visible). Red bars are the danger zone.</small></div>
 <div class="card"><h3 style="margin-top:0">New customers leave more</h3><div id="ten"></div><small>Average chance of leaving by how long the customer has been with you.</small></div></div>
 <div class="card"><h3 style="margin-top:0">Why customers may leave</h3><div id="why"></div></div>
@@ -41,17 +42,33 @@
 <script>
 const $=id=>document.getElementById(id);let S=null;
 function go(x){if(x==='an')an();for(const k of ['up','res','as','an','ag','lab','rep']){$(k).style.display=k===x?'block':'none';$('n_'+k).classList.toggle('on',k===x)}}
-async function j(u,o){const r=await fetch(u,o);if(r.status===401)location='/signin';if(!r.ok)throw new Error((await r.json()).detail);return r.json()}
+async function j(u,o){const r=await fetch(u,o);if(r.status===401)location='/signin';if(!r.ok){let m='Something went wrong. Try again, or use the sample.';try{m=(await r.json()).detail||m}catch(_){}throw new Error(m)}return r.json()}
 j('/api/me').then(m=>$('who').textContent=m.email);
-async function upl(){const f=$('f').files[0];if(!f){$('uerr').textContent='Choose a CSV file first';return}
- const fd=new FormData();fd.append('file',f);try{await j('/api/upload',{method:'POST',body:fd});await load('High');go('res')}catch(e){$('uerr').textContent=e.message}}
-async function smp(){$('uerr').textContent='Analyzing 3,150 customers...';await j('/api/sample',{method:'POST'});await load('High');go('res')}
+async function upl(){$('uerr').textContent='';$('map').style.display='none';const f=$('f').files[0];if(!f){$('uerr').textContent='Choose a CSV file first';return}
+ const fd=new FormData();fd.append('file',f);$('uerr').textContent='Reading your file...';
+ try{const r=await j('/api/upload',{method:'POST',body:fd});$('uerr').textContent='';
+  if(r.needs_mapping){showMap(r);return}
+  await load('High');go('res')}catch(e){$('uerr').textContent=e.message}}
+function opt(cols,sel,none){return (none?'<option value="">'+none+'</option>':'')+cols.map(c=>`<option ${c===sel?'selected':''}>${c.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join('')}
+function showMap(r){const g=r.suggest||{};const m=$('map');m.style.display='block';
+ m.innerHTML=`<h3 style="margin-top:0">Match your columns</h3><p>Your file has ${r.rows.toLocaleString()} customers and ${r.columns.length} columns. We train a model on <b>your</b> file, so we only need to know which column says who left.</p>
+ <p><b>Who left? (required)</b><br><select id="m_t">${opt(r.columns,g.target,'Choose...')}</select><br><small>Must have exactly two values, like Yes/No or 1/0.</small></p>
+ <p>Customer ID (optional)<br><select id="m_i">${opt(r.columns,g.id,'None')}</select></p>
+ <p>Months as customer (optional, for the tenure chart)<br><select id="m_te">${opt(r.columns,g.tenure,'None')}</select></p>
+ <p>Customer value or monthly charge (optional, for value at risk)<br><select id="m_v">${opt(r.columns,g.value,'None')}</select></p>
+ <p><button class="btn" onclick="trn()">Train on my file and analyze</button> <span id="merr" class="err" style="font-weight:700"></span></p>`}
+async function trn(){const v=id=>$(id).value||null;if(!v('m_t')){$('merr').textContent='Choose the column that says who left.';return}
+ $('merr').textContent='Training on your file. This can take up to a minute...';
+ try{await j('/api/train',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:v('m_t'),id:v('m_i'),tenure:v('m_te'),value:v('m_v')})});$('map').style.display='none';await load('High');go('res')}catch(e){$('merr').textContent=e.message}}
+async function smp(){$('map').style.display='none';$('uerr').textContent='Analyzing 3,150 customers...';try{await j('/api/sample',{method:'POST'});$('uerr').textContent='';await load('High');go('res')}catch(e){$('uerr').textContent=e.message}}
 async function load(b){const d=await j('/api/results?band='+b+'&limit=25');S=d.summary;
  $('sub').textContent=S.total.toLocaleString()+' customers analyzed';
  $('kpis').innerHTML=`<div class="kpi"><b>${S.total.toLocaleString()}</b><span>customers analyzed</span></div><div class="kpi risk"><b>${S.high}</b><span>at high risk (${Math.round(S.high/S.total*100)}%)</span></div><div class="kpi"><b>${S.medium}</b><span>at medium risk</span></div><div class="kpi risk"><b>${Math.round(S.revenue_at_risk).toLocaleString()}</b><span>account value at risk (sample units)</span></div>`;
+ const M=S.model,mn=$('modelnote');if(M){mn.style.display='block';mn.innerHTML=`<b>Model trained on your file.</b> On ${M.heldout_rows.toLocaleString()} customers it did not train on: ${(M.accuracy*100).toFixed(1)}% accuracy (always guessing the majority would score ${(M.baseline_accuracy*100).toFixed(1)}%), AUC ${M.auc}. Risk scores below come from cross-validation, so each customer was scored by a model that never saw them. Biggest inputs: ${M.top_features.join(', ')}. ${(M.warnings||[]).join(' ')}<br><small>Reasons are churn rates measured in your file for the top inputs. They show patterns, not proof of cause.</small>`}else{mn.style.display='none'}
  const mx=Math.max(...S.hist);$('hist').innerHTML=S.hist.map((v,i)=>`<div class="${i>=7?'hot':''}" style="height:${Math.max(3,Math.sqrt(v/mx)*100)}%" title="${v}"></div>`).join('');
  $('axis').innerHTML=S.hist.map((v,i)=>`<span>${i*10}%</span>`).join('');
  $('ten').innerHTML=S.tenure_risk.map(t=>`<div style="margin:10px 0"><div style="display:flex;justify-content:space-between"><b>${t.label}</b><span>${Math.round(t.avg*100)}% (${t.n})</span></div><div style="background:#e8fafa;border-radius:8px"><div style="width:${t.avg*100}%;min-width:3px;height:12px;border-radius:8px;background:linear-gradient(90deg,#00808c,#d45d4a)"></div></div></div>`).join('');
+ if(S.model&&!S.has_tenure)$('ten').innerHTML='<small>No tenure column was chosen, so this chart is empty.</small>';
  $('why').innerHTML=S.top_reasons.map(r=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e6f5f5"><span>${r[0]}</span><b>${r[1]} customers</b></div>`).join('');
  $('rows').innerHTML=d.customers.map(c=>`<tr><td><b>#${c.id}</b></td><td><span class="pill ${c.band}">${Math.round(c.risk*100)}% ${c.band}</span></td><td>${c.reasons.join('<br>')}</td><td>${c.actions.join('<br>')}</td></tr>`).join('');
  $('hist2').innerHTML=d.history.map(h=>`<div style="padding:6px 0;border-bottom:1px solid #e6f5f5">${h.name} - ${h.summary.high} high risk of ${h.summary.total}</div>`).join('')}
