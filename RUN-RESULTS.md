@@ -1,6 +1,6 @@
 # Run results (real)
 - Tests: 5/5 pass (full user journey: sign-up, sample analysis, filtered results, Arabic answer, DOCX report; 401 without login; bad login).
-- Sample run: 3,150 real customers scored in about 2 seconds on CPU: 453 high risk (14%), 73 medium.
+- Sample run: 3,150 real customers scored in about 2 seconds on CPU: 453 high risk (14%), 73 medium. This is in-sample: about 75% of these customers were used to train the model, so it is a demo of the dashboard, not a held-out rate.
 - Model quality (held-out, from churn-insight-platform): ROC-AUC 0.9924, accuracy 96.3%.
-- DL churn MLP 97.0% acc / AUC 0.9872 (630 unseen customers); Arabic sentiment 73.7% (82.7% when not neutral) on 1,000 unseen reviews; vision 94.0% on 2,161 unseen tiles; campaign agents ran 91s on CPU with all LLM drafts rejected by the Critic.
+- DL churn MLP 97.0% acc / AUC 0.9872 (630 unseen customers, a different split from the 788-customer one above; on its own split gradient boosting gets 96.35% / AUC 0.993, so the MLP wins on accuracy only because its threshold was tuned, not on AUC); Arabic sentiment 73.7% (82.7% when not neutral) on 1,000 unseen reviews; vision 94.0% on the 2,161 held-out tiles of sat-vision-service (that split also chose the training recipe, so slightly optimistic); campaign agents: the offline run (small open model) had all LLM drafts rejected by the Critic and fell back to templates; the later hosted-model run (Gemini free tier, 3 segments) had 3/3 drafts accepted, see README.
 - Not deployed to a public host yet (needs a hosting account). Runs locally and via docker compose.

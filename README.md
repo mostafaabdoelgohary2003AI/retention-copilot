@@ -15,9 +15,9 @@ User journey: landing page -> create account / sign in -> upload a customer CSV 
 | Module | Domain | Model / data | Honest result |
 |---|---|---|---|
 | Churn risk | ML | Gradient boosting, Iranian Churn (UCI 563, 3,150 customers) | 96.3% acc, AUC 0.9924 (held-out) |
-| Churn risk (DL) | Deep learning | PyTorch MLP, same data, threshold chosen on a validation slice | 97.0% acc, AUC 0.9872 on 630 unseen customers (`scripts/train_dl.py`) |
+| Churn risk (DL) | Deep learning | PyTorch MLP, same data, threshold chosen on a validation slice | 97.0% acc, AUC 0.9872 on 630 unseen customers (`scripts/train_dl.py`). Different split from the row above; on that same split gradient boosting scores 96.35% / AUC 0.993, so the MLP is higher on accuracy (tuned threshold) but lower on AUC |
 | Comment reader | Arabic NLP | CAMeLBERT-MSA sentiment (public model, used as-is) + keyword topics | 73.7% on 1,000 unseen Arabic restaurant reviews (it also answers "neutral", which counts as wrong); 82.7% when it picks a side. A TF-IDF logistic regression trained on the same reviews gets 86.5% but only knows restaurants (`scripts/eval_nlp.py`) |
-| Branch site check | Computer vision | ResNet18 fine-tuned on EuroSAT (from sat-vision-service) | 94.0% on 2,161 unseen tiles (`scripts/eval_vision.py`) |
+| Branch site check | Computer vision | ResNet18 fine-tuned on EuroSAT (from sat-vision-service) | 94.0% on the 2,161 held-out tiles of sat-vision-service (`scripts/eval_vision.py`; that split was also used to pick the training recipe, so slightly optimistic) |
 | Win-back agents | Multi-agent + GenAI | KMeans Segmenter, rule Strategist, Qwen2.5-0.5B-Instruct Copywriter, rule Critic, Planner | The 0.5B model writes weak Arabic. The Critic rejected all 3 of its drafts in the sample run and the safe template was used. Use a larger model with `LLM_MODEL=...` for better drafts |
 | Analytics | Data analytics | Segment tables from the scored customers | computed live |
 
