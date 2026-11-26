@@ -1,0 +1,11 @@
+# Free-tier demo build (Render). Trains the churn model from the bundled sample CSV.
+# No API keys, no LLM, no large model downloads at build time.
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+ENV ENABLE_LLM=0 SQLITE_PATH=/tmp/app.db
+RUN mkdir -p results && python -m scripts.train_churn
+EXPOSE 10000
+CMD ["sh","-c","uvicorn src.api:app --host 0.0.0.0 --port ${PORT:-10000}"]
