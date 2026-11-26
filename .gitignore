@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 *.db
 .env
+*.joblib
+*.pt
+results/test_app.db
+results/report_*.docx
