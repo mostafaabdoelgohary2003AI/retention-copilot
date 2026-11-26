@@ -41,5 +41,3 @@ Built with AI pair-programming; numbers come from real runs.
 ## Files not in this repo
 The Arabic reviews parquet is not committed. Run `python scripts/fetch_models.py` to download it and the models (public Hugging Face sources).
 
-## CI
-The GitHub Actions workflow is stored at `ci/github-actions-ci.yml`. Copy it to `.github/workflows/ci.yml` to enable it.
