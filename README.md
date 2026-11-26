@@ -41,3 +41,8 @@ Built with AI pair-programming; numbers come from real runs.
 ## Files not in this repo
 The Arabic reviews parquet is not committed. Run `python scripts/fetch_models.py` to download it and the models (public Hugging Face sources).
 
+
+## Hosted LLM (real API call)
+Win-back messages are drafted by a hosted LLM when `LLM_API_KEY` is set in the environment (never committed). Default: Google Gemini API free tier through its OpenAI-compatible endpoint (`LLM_BASE_URL`, `LLM_HOSTED_MODEL`, default `gemini-3.1-flash-lite`). Order: hosted LLM, then the local Qwen2.5-0.5B (`ENABLE_LLM=1`), then the template. Every draft passes the Critic checks (Arabic, length, no discount or percentage promised).
+
+Measured run (Nov 26, 2026, free tier, 300 high-risk customers in 3 segments): 3 of 3 drafts came from the hosted model and passed the Critic; one call took 0.7 s, others 4 to 14 s in the campaign run, one standalone call 17 s, so expect variable latency on the free tier. The test-suite runs without a key and checks the template path.

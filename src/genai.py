@@ -32,21 +32,42 @@ def _ok(t):
     bad = re.search(r"\d+\s*%|خصم|مجاني|[\[\]{}]|أنا |يمكنك تقديم|[A-Za-z]{3,}", t)
     return bool(polite) and not bad and 40 <= len(t) <= 450 and ar / max(len(t), 1) > 0.6
 
+def _hosted(msgs, max_tokens=400):
+    """OpenAI-compatible chat call (default: Gemini API free tier). Key only from env LLM_API_KEY."""
+    import json, urllib.request
+    key = os.environ.get("LLM_API_KEY")
+    if not key: return None
+    base = os.environ.get("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai").rstrip("/")
+    model = os.environ.get("LLM_HOSTED_MODEL", "gemini-3.1-flash-lite")
+    body = json.dumps({"model": model, "messages": msgs, "max_tokens": max_tokens, "temperature": 0.4}).encode()
+    req = urllib.request.Request(base + "/chat/completions", body, {"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+    d = json.load(urllib.request.urlopen(req, timeout=40))
+    return d["choices"][0]["message"]["content"].strip(), model
+
 def draft(reasons):
-    """returns {text, source: 'llm'|'template'}"""
+    """returns {text, source: 'llm-hosted'|'llm'|'template'}.
+    Order: hosted LLM (if LLM_API_KEY set) -> local Qwen (if ENABLE_LLM=1) -> template. Every draft goes through the Critic checks."""
+    why = "؛ ".join(REASON_AR.get(r, r) for r in reasons[:2])
+    sys_p = "أنت موظف خدمة عملاء محترف. اكتب بالعربية الفصحى البسيطة رسالة قصيرة (ثلاث جمل) مهذبة لعميل قد يغادر. لا تذكر أي خصم أو نسبة أو وعد مالي ولا تستخدم أقواساً أو أسماء مكانية."
+    rejected = False
+    try:
+        h = _hosted([{"role": "system", "content": sys_p}, {"role": "user", "content": f"اكتب رسالة لعميل. السبب: {why}."}])
+        if h:
+            if _ok(h[0]): return {"text": h[0], "source": "llm-hosted", "model": h[1]}
+            rejected = True
+    except Exception:
+        pass
     if ENABLE:
         try:
             import torch
             tok, lm = _load()
-            why = "؛ ".join(REASON_AR.get(r, r) for r in reasons[:2])
-            msgs = [{"role": "system", "content": "أنت موظف خدمة عملاء محترف. اكتب بالعربية الفصحى البسيطة رسالة قصيرة (ثلاث جمل) مهذبة لعميل قد يغادر. لا تذكر أي خصم أو نسبة أو وعد مالي."},
-                    {"role": "user", "content": f"اكتب رسالة لعميل. السبب: {why}."}]
+            msgs = [{"role": "system", "content": sys_p}, {"role": "user", "content": f"اكتب رسالة لعميل. السبب: {why}."}]
             ids = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True)
             with torch.no_grad():
                 out = lm.generate(**ids, max_new_tokens=110, do_sample=False, repetition_penalty=1.1)
             t = tok.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True).strip()
             if _ok(t): return {"text": t, "source": "llm"}
-            return {"text": template(reasons), "source": "template", "llm_rejected": True}
+            rejected = True
         except Exception:
             pass
-    return {"text": template(reasons), "source": "template", "llm_rejected": False}
+    return {"text": template(reasons), "source": "template", "llm_rejected": rejected}

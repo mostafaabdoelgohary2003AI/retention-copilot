@@ -27,6 +27,7 @@ def test_assistant_without_data():
 
 def test_ai_modules():
     os.environ["ENABLE_LLM"] = "0"
+    os.environ.pop("LLM_API_KEY", None)  # deterministic template path in tests
     from src import genai
     genai.ENABLE = False
     import pandas as pd
