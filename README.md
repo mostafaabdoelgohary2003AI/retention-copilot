@@ -8,6 +8,18 @@ A small web product that answers one business question: **which customers are ab
 
 User journey: landing page -> create account / sign in -> upload a customer CSV (or use the 3,150-customer sample) -> dashboard (risk levels, risk by tenure, main reasons, contact list with suggested actions) -> Arabic assistant -> downloadable Word report.
 
+## Screenshots
+Real captures of the app running locally on the public 3,150-customer sample, with the language-model features off. The signed-in user is a fictional sample account.
+
+| | |
+|---|---|
+| ![Landing page](assets/screenshots/01-landing.png) | ![Who is at risk](assets/screenshots/02-who-is-at-risk.png) |
+| Landing page | Who is at risk: counts, risk distribution, tenure effect, main reasons |
+| ![Arabic assistant](assets/screenshots/03-arabic-assistant.png) | ![Analytics](assets/screenshots/04-analytics.png) |
+| Arabic assistant (fixed rules plus the computed numbers) | Analytics: complaints, customer value, value at risk |
+| ![Report](assets/screenshots/05-report.png) | |
+| Downloadable Word report | |
+
 ## What is real
 - ML model: gradient boosting trained on the public Iranian Churn dataset (UCI #563, 3,150 customers). Held-out ROC-AUC 0.992, accuracy 96.3% (see the churn-insight-platform repo for the benchmark).
 - Accounts and run history in a real database (SQLite locally, Postgres with docker compose), with SQL migrations. Passwords are salted PBKDF2 hashes.
