@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" width="128" alt="retention-copilot logo"></p>
+
 # Retention Copilot
 
 A small web product that answers one business question: **which customers are about to leave, why, and what should we do?**
